@@ -71,7 +71,6 @@ public:
     m_beforeRetrCallback = other.m_beforeRetrCallback;
     m_afterRetrCallback = other.m_afterRetrCallback;
     m_forkCb = other.m_forkCb;
-    m_updateRttCb = other.m_updateRttCb;
   }
 
   /// Callback for the ACK management.
@@ -133,8 +132,6 @@ protected:
   virtual Ptr<TcpSocketBase> Fork (void);
   virtual void CompleteFork (Ptr<Packet> p, const TcpHeader& tcpHeader,
                              const Address& fromAddress, const Address& toAddress);
-  virtual void UpdateRttHistory (const SequenceNumber32 &seq, uint32_t sz,
-                                 bool isRetransmission);
 
 private:
   AckManagementCb m_rcvAckCb;       //!< Receive ACK callback.
@@ -142,7 +139,6 @@ private:
   RetrCb m_beforeRetrCallback;      //!< Before retransmission callback.
   RetrCb m_afterRetrCallback;       //!< After retransmission callback.
   Callback<void, Ptr<TcpSocketMsgBase> > m_forkCb;  //!< Fork callback.
-  UpdateRttCallback m_updateRttCb;  //!< Update RTT callback.
 };
 
 
@@ -638,6 +634,8 @@ protected:
   virtual void CongStateTrace (const TcpSocketState::TcpCongState_t oldValue,
                                const TcpSocketState::TcpCongState_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -648,6 +646,8 @@ protected:
    */
   virtual void CWndTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -660,6 +660,8 @@ protected:
    */
   virtual void RttTrace (Time oldTime, Time newTime)
   {
+    NS_UNUSED (oldTime);
+    NS_UNUSED (newTime);
   }
 
   /**
@@ -672,6 +674,8 @@ protected:
    */
   virtual void SsThreshTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -684,6 +688,50 @@ protected:
    */
   virtual void BytesInFlightTrace (uint32_t oldValue, uint32_t newValue)
   {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief RTO changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void RtoTrace (Time oldValue, Time newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief Next tx seq changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void NextTxSeqTrace (SequenceNumber32 oldValue, SequenceNumber32 newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
+  }
+
+  /**
+   * \brief Highest tx seq changes
+   *
+   * This applies only for sender socket.
+   *
+   * \param oldValue old value
+   * \param newValue new value
+   */
+  virtual void HighestTxSeqTrace (SequenceNumber32 oldValue, SequenceNumber32 newValue)
+  {
+    NS_UNUSED (oldValue);
+    NS_UNUSED (newValue);
   }
 
   /**
@@ -692,6 +740,7 @@ protected:
    */
   virtual void NormalClose (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -702,6 +751,7 @@ protected:
   virtual void ErrorClose  (SocketWho who)
   {
     /** \todo indicate the error */
+    NS_UNUSED (who);
   }
 
   /**
@@ -710,6 +760,7 @@ protected:
    */
   virtual void QueueDrop   (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -718,6 +769,7 @@ protected:
    */
   virtual void PhyDrop     (SocketWho who)
   {
+    NS_UNUSED (who);
   }
 
   /**
@@ -732,6 +784,9 @@ protected:
   virtual void RcvAck      (const Ptr<const TcpSocketState> tcb,
                             const TcpHeader& h, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (h);
+    NS_UNUSED (who);
   }
 
   /**
@@ -746,6 +801,9 @@ protected:
   virtual void ProcessedAck (const Ptr<const TcpSocketState> tcb,
                              const TcpHeader& h, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (h);
+    NS_UNUSED (who);
   }
 
   /**
@@ -774,6 +832,8 @@ protected:
    */
   virtual void AfterRTOExpired (const Ptr<const TcpSocketState> tcb, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (who);
   }
 
   /**
@@ -784,6 +844,8 @@ protected:
    */
   virtual void BeforeRTOExpired (const Ptr<const TcpSocketState> tcb, SocketWho who)
   {
+    NS_UNUSED (tcb);
+    NS_UNUSED (who);
   }
 
   /**
@@ -796,6 +858,10 @@ protected:
   virtual void UpdatedRttHistory (const SequenceNumber32 & seq, uint32_t sz,
                                   bool isRetransmission, SocketWho who)
   {
+    NS_UNUSED (seq);
+    NS_UNUSED (sz);
+    NS_UNUSED (isRetransmission);
+    NS_UNUSED (who);
   }
 
   /**
@@ -806,6 +872,8 @@ protected:
    */
   virtual void DataSent (uint32_t size, SocketWho who)
   {
+    NS_UNUSED (size);
+    NS_UNUSED (who);
   }
 
   /**

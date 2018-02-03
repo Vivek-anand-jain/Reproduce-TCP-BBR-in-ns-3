@@ -177,7 +177,6 @@ TcpGeneralTest::DoRun (void)
   m_receiverSocket->SetAfterRetransmitCb (MakeCallback (&TcpGeneralTest::AfterRetransmitCb, this));
   m_receiverSocket->SetBeforeRetransmitCb (MakeCallback (&TcpGeneralTest::BeforeRetransmitCb, this));
   m_receiverSocket->SetForkCb (MakeCallback (&TcpGeneralTest::ForkCb, this));
-  m_receiverSocket->SetUpdateRttHistoryCb (MakeCallback (&TcpGeneralTest::UpdateRttHistoryCb, this));
   m_receiverSocket->TraceConnectWithoutContext ("Tx",
                                                 MakeCallback (&TcpGeneralTest::TxPacketCb, this));
   m_receiverSocket->TraceConnectWithoutContext ("Rx",
@@ -194,7 +193,6 @@ TcpGeneralTest::DoRun (void)
   m_senderSocket->SetAfterRetransmitCb (MakeCallback (&TcpGeneralTest::AfterRetransmitCb, this));
   m_senderSocket->SetBeforeRetransmitCb (MakeCallback (&TcpGeneralTest::BeforeRetransmitCb, this));
   m_senderSocket->SetDataSentCallback (MakeCallback (&TcpGeneralTest::DataSentCb, this));
-  m_senderSocket->SetUpdateRttHistoryCb (MakeCallback (&TcpGeneralTest::UpdateRttHistoryCb, this));
   m_senderSocket->TraceConnectWithoutContext ("CongestionWindow",
                                               MakeCallback (&TcpGeneralTest::CWndTrace, this));
   m_senderSocket->TraceConnectWithoutContext ("SlowStartThreshold",
@@ -209,6 +207,13 @@ TcpGeneralTest::DoRun (void)
                                               MakeCallback (&TcpGeneralTest::RttTrace, this));
   m_senderSocket->TraceConnectWithoutContext ("BytesInFlight",
                                               MakeCallback (&TcpGeneralTest::BytesInFlightTrace, this));
+  m_senderSocket->TraceConnectWithoutContext ("RTO",
+                                              MakeCallback (&TcpGeneralTest::RtoTrace, this));
+  m_senderSocket->TraceConnectWithoutContext ("NextTxSequence",
+                                              MakeCallback (&TcpGeneralTest::NextTxSeqTrace, this));
+  m_senderSocket->TraceConnectWithoutContext ("HighestSequence",
+                                               MakeCallback (&TcpGeneralTest::HighestTxSeqTrace, this));
+
 
   m_remoteAddr = InetSocketAddress (serverAddress, 4477);
 
@@ -281,13 +286,13 @@ TcpGeneralTest::CreateSocket (Ptr<Node> node, TypeId socketType,
 Ptr<ErrorModel>
 TcpGeneralTest::CreateSenderErrorModel ()
 {
-  return 0;
+  return nullptr;
 }
 
 Ptr<ErrorModel>
 TcpGeneralTest::CreateReceiverErrorModel ()
 {
-  return 0;
+  return nullptr;
 }
 
 Ptr<TcpSocketMsgBase>
@@ -322,6 +327,7 @@ TcpGeneralTest::QueueDropCb ( std::string context, Ptr<const Packet> p)
 void
 TcpGeneralTest::PhyDropCb (std::string context, Ptr<const Packet> p)
 {
+  NS_UNUSED (p);
   if (context.compare ("SENDER") == 0)
     {
       PhyDrop (SENDER);
@@ -346,25 +352,6 @@ TcpGeneralTest::NormalCloseCb (Ptr<Socket> socket)
   else if (socket->GetNode () == m_senderSocket->GetNode ())
     {
       NormalClose (SENDER);
-    }
-  else
-    {
-      NS_FATAL_ERROR ("Closed socket, but not recognized");
-    }
-}
-
-void
-TcpGeneralTest::UpdateRttHistoryCb (Ptr<const TcpSocketBase> tcp,
-                                    const SequenceNumber32 & seq, uint32_t sz,
-                                    bool isRetransmission)
-{
-  if (tcp->GetNode () == m_receiverSocket->GetNode ())
-    {
-      UpdatedRttHistory (seq, sz, isRetransmission, RECEIVER);
-    }
-  else if (tcp->GetNode () == m_senderSocket->GetNode ())
-    {
-      UpdatedRttHistory (seq, sz, isRetransmission, SENDER);
     }
   else
     {
@@ -994,24 +981,6 @@ TcpSocketMsgBase::SetForkCb (Callback<void, Ptr<TcpSocketMsgBase> > cb)
 }
 
 void
-TcpSocketMsgBase::SetUpdateRttHistoryCb (UpdateRttCallback cb)
-{
-  NS_ASSERT (!cb.IsNull ());
-  m_updateRttCb = cb;
-}
-
-void
-TcpSocketMsgBase::UpdateRttHistory (const SequenceNumber32 &seq, uint32_t sz,
-                                    bool isRetransmission)
-{
-  TcpSocketBase::UpdateRttHistory (seq, sz, isRetransmission);
-  if (!m_updateRttCb.IsNull ())
-    {
-      m_updateRttCb (this, seq, sz, isRetransmission);
-    }
-}
-
-void
 TcpSocketMsgBase::CompleteFork (Ptr<Packet> p, const TcpHeader &tcpHeader,
                                 const Address &fromAddress, const Address &toAddress)
 {
@@ -1084,7 +1053,7 @@ TcpSocketSmallAcks::SendEmptyPacket (uint8_t flags)
       p->AddPacketTag (ipHopLimitTag);
     }
 
-  if (m_endPoint == 0 && m_endPoint6 == 0)
+  if (m_endPoint == nullptr && m_endPoint6 == nullptr)
     {
       NS_LOG_WARN ("Failed to send empty packet due to null endpoint");
       return;
@@ -1133,7 +1102,7 @@ TcpSocketSmallAcks::SendEmptyPacket (uint8_t flags)
 
   // end of division in small acks
 
-  if (m_endPoint != 0)
+  if (m_endPoint != nullptr)
     {
       header.SetSourcePort (m_endPoint->GetLocalPort ());
       header.SetDestinationPort (m_endPoint->GetPeerPort ());
@@ -1165,7 +1134,7 @@ TcpSocketSmallAcks::SendEmptyPacket (uint8_t flags)
           m_synCount--;
         }
     }
-  if (m_endPoint != 0)
+  if (m_endPoint != nullptr)
     {
       m_tcp->SendPacket (p, header, m_endPoint->GetLocalAddress (),
                          m_endPoint->GetPeerAddress (), m_boundnetdevice);
