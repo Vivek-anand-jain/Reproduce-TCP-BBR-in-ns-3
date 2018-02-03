@@ -21,6 +21,20 @@ def options(opt):
 def configure(conf):
     conf.env['ENABLE_NSC'] = False
 
+    have_sqlite3 = conf.check_cfg(package='sqlite3', uselib_store='SQLITE3',
+                                  args=['--cflags', '--libs'],
+                                  mandatory=False)
+
+    conf.env['SQLITE_INTERNET'] = have_sqlite3
+    conf.report_optional_feature("SqliteDataOutput", "SQlite stats data output",
+                                 conf.env['SQLITE_STATS'],
+                                 "library 'sqlite3' not found")
+
+    have_sem = conf.check_nonfatal(header_name='semaphore.h', define_name='HAVE_SEMAPHORE_H')
+    conf.env['SEMAPHORE_ENABLED'] = have_sem
+
+    conf.write_config_header('ns3/internet-config.h', top=True)
+
     if Options.options.disable_nsc:
         conf.report_optional_feature("nsc", "Network Simulation Cradle", False,
                                      "disabled by user request")
@@ -287,6 +301,9 @@ def build(bld):
         'test/ipv4-rip-test.cc',
         
         ]
+    if bld.env['SQLITE_INTERNET'] and bld.env['SEMAPHORE_ENABLED']:
+        internet_test.source.append('test/sqlite-output.cc')
+
     privateheaders = bld(features='ns3privateheader')
     privateheaders.module = 'internet'
     privateheaders.source = [
