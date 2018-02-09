@@ -475,7 +475,6 @@ TcpSocketBase::GetSocketType (void) const
 Ptr<Node>
 TcpSocketBase::GetNode (void) const
 {
-  NS_LOG_FUNCTION_NOARGS ();
   return m_node;
 }
 
@@ -1552,7 +1551,7 @@ TcpSocketBase::DupAck ()
       // (indicating at least three segments have arrived above the current
       // cumulative acknowledgment point, which is taken to indicate loss)
       // go to step (4).
-      else if (m_txBuffer->IsLost (m_highRxAckMark + m_tcb->m_segmentSize, m_retxThresh, m_tcb->m_segmentSize))
+      else if (m_txBuffer->IsLost (m_highRxAckMark + m_tcb->m_segmentSize))
         {
           EnterRecovery ();
           NS_ASSERT (m_tcb->m_congState == TcpSocketState::CA_RECOVERY);
@@ -1713,6 +1712,7 @@ TcpSocketBase::ProcessAck (const SequenceNumber32 &ackNumber, bool scoreboardUpd
       if (ackNumber < m_recover && m_tcb->m_congState == TcpSocketState::CA_RECOVERY)
         {
           m_txBuffer->DiscardUpTo (ackNumber);
+          m_txBuffer->MarkHeadAsLost ();
           DoRetransmit (); // Assume the next seq is lost. Retransmit lost packet
           if (!m_sackEnabled)
             {
@@ -2794,8 +2794,7 @@ TcpSocketBase::SendPendingData (bool withAck)
       //       failure (no data to send), return without sending anything
       //       (i.e., terminate steps C.1 -- C.5).
       SequenceNumber32 next;
-      if (!m_txBuffer->NextSeg (&next, m_retxThresh, m_tcb->m_segmentSize,
-                                m_tcb->m_congState == TcpSocketState::CA_RECOVERY))
+      if (!m_txBuffer->NextSeg (&next, m_tcb->m_congState == TcpSocketState::CA_RECOVERY))
         {
           NS_LOG_INFO ("no valid seq to transmit, or no data available");
           break;
@@ -2909,7 +2908,7 @@ TcpSocketBase::BytesInFlight () const
   if (m_sackEnabled)
     {
       // flightSize == UnAckDataCount (), but we avoid the call to save log lines
-      bytesInFlight = m_txBuffer->BytesInFlight (m_retxThresh, m_tcb->m_segmentSize);
+      bytesInFlight = m_txBuffer->BytesInFlight (m_tcb->m_segmentSize);
     }
   else
     {
@@ -3208,7 +3207,7 @@ TcpSocketBase::ReTxTimeout ()
     {
       // When SACK is not enabled, we start fresh after a RTO by putting 
       // all previously sent but unacked items on the sent list.
-      m_txBuffer->ResetSentList (0);
+      m_txBuffer->ResetSentList ();
     }
   else
     {
@@ -3273,7 +3272,8 @@ TcpSocketBase::ReTxTimeout ()
   DoRetransmit ();
 
   NS_ASSERT_MSG (BytesInFlight () <= m_tcb->m_segmentSize,
-                 "In flight there is more than one segment");
+                 "In flight (" << BytesInFlight () <<
+                 ") there is more than one segment (" << m_tcb->m_segmentSize << ")");
 }
 
 void
@@ -3685,7 +3685,7 @@ TcpSocketBase::ProcessOptionSack (const Ptr<const TcpOption> option)
 
   Ptr<const TcpOptionSack> s = DynamicCast<const TcpOptionSack> (option);
   TcpOptionSack::SackList list = s->GetSackList ();
-  return m_txBuffer->Update (list);
+  return m_txBuffer->Update (list, m_retxThresh);
 }
 
 void
