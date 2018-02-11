@@ -760,6 +760,74 @@ phase or not
 
 More information (paper): http://cs.northwestern.edu/~akuzma/rice/doc/TCP-LP.pdf
 
+TCP-BBR
+^^^^^^^
+
+TCP-BBR is a congestion based congestion control algorithm. It seeks to operate
+at Kleinrock point where sender experiences maximum delivery rate with minimum RTT.
+To do so, it creates a network model comprises of above value observed so far. With
+the help of this model, BBR estimates BDP (max. bandwidth * minimum RTT) and controls
+the speed of sending data and the maximum amount of data can be inflight.
+
+It uses two factors:
+
+1. pacing_gain: controls the rate of sending data
+
+2. cwnd_gain: controls the amount of data to send
+
+
+On receipt of acknowledgement:
+    OnAckReceive ():
+        1. rtt = now - packet.sent_time
+        2. update_minimum_rtt (rtt)
+        3. delivery_rate = estimate_delivery_rate (packet)
+        4. update_maximum_bandwidth (delivery_rate)
+
+On data send:
+    Send ():
+        1. bdp = max_bandwidth * min_rtt
+        2. if cwnd * bdp < inflight
+                    return
+        3. if now > nextSendTime
+            transmit (packet)
+
+            nextSendTime = now + packet.size / (pacing_gaini * max_bandwidth)
+
+           else
+            return
+
+        4. Schedule (nextSendTime, Send)
+
+To enable BBR on all TCP sockets, the following configuration can be used:
+
+::
+
+  Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpBbr::GetTypeId ()));
+
+To enable BBR on a chosen TCP socket, the following configuration can be used:
+
+::
+
+  Config::Set ("$ns3::NodeListPriv/NodeList/1/$ns3::TcpL4Protocol/SocketType", TypeIdValue (TcpBbr::GetTypeId ()));
+
+The following unit tests have been written to validate the implementation of BBR:
+
+* BBR should initialize its internal variable properly
+* BBR should enable (if not already done) TCP pacing feature.
+* Test to validate the value pacing_gain and cwnd_gain in their respective state.
+
+The implementation of BBR in ns-3 is done by taking its Internet-Draft as a reference.
+In comparison to the internet draft, the scope and limitations of the current BBR
+implementation are:
+
+* It assumes that TCP socket is pacing featured.
+* It uses delivery rate estimation provided by TCP Socket.
+* Although all functionality from Internet-Draft is implemented, its paper discusses traffic policing which can be a possible enhancement.
+
+More information (internet-draft): https://tools.ietf.org/html/draft-cardwell-iccrg-bbr-congestion-control-00
+
+More information (delivery rate estimation): https://tools.ietf.org/html/draft-cheng-iccrg-delivery-rate-estimation-00
+
 Validation
 ++++++++++
 

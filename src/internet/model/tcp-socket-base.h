@@ -79,6 +79,33 @@ public:
   bool            retx;   //!< True if this has been retransmitted
 };
 
+struct PerPacketState
+{
+  uint64_t        m_delivered;
+  Time            m_deliveredTime;
+  Time            m_firstSentTime;
+  uint32_t        m_isAppLimited;
+  Time            m_sentTime;
+  uint32_t        m_size;
+  Time            m_lastSent;
+};
+
+typedef std::map<SequenceNumber32, struct PerPacketState> PerPacketState_t;
+
+struct RateSample
+{
+  DataRate      m_deliveryRate;   //!< The delivery rate sample
+  uint32_t      m_isAppLimited;   //!< Indicates whether the rate sample is application-limited
+  Time          m_interval;       //!< The length of the sampling interval
+  uint32_t      m_delivered;      //!< The amount of data marked as delivered over the sampling interval
+  uint32_t      m_priorDelivered; //!< The delivered count of the most recent packet delivered
+  Time          m_priorTime;      //!< The delivered time of the most recent packet delivered
+  Time          m_sendElapsed;    //!< Send time interval calculated from the most recent packet delivered
+  Time          m_ackElapsed;     //!< ACK time interval calculated from the most recent packet delivered
+  uint32_t      m_lastAckedSackedBytes;   //!< Size of data sacked in the last ack
+  uint32_t      m_packetLoss;
+};
+
 /**
  * \brief Data structure that records the congestion state of a connection
  *
@@ -169,10 +196,10 @@ public:
   static const char* const TcpCongStateName[TcpSocketState::CA_LAST_STATE];
 
   // Congestion control
-  TracedValue<uint32_t>  m_cWnd             {0}; //!< Congestion window
-  TracedValue<uint32_t>  m_ssThresh         {0}; //!< Slow start threshold
-  uint32_t               m_initialCWnd      {0}; //!< Initial cWnd value
-  uint32_t               m_initialSsThresh  {0}; //!< Initial Slow Start Threshold value
+  TracedValue<uint32_t>  m_cWnd;            //!< Congestion window
+  TracedValue<uint32_t>  m_ssThresh;        //!< Slow start threshold
+  uint32_t               m_initialCWnd;     //!< Initial cWnd value
+  uint32_t               m_initialSsThresh; //!< Initial Slow Start Threshold value
 
   // Segment
   uint32_t               m_segmentSize   {0}; //!< Segment size
@@ -192,6 +219,18 @@ public:
   DataRate               m_currentPacingRate {0};    //!< Current Pacing rate
 
   Time                   m_minRtt  {Time::Max ()};   //!< Minimum RTT observed throughout the connection
+  Time                   m_lastRtt {Time::Max ()};   //!< Last RTT observed
+  uint32_t               m_bytesInFlight     {0};    //!< Bytes in flight
+  uint32_t               m_priorInFlight     {0};    //!< Prior Bytes in flight
+
+  uint64_t               m_delivered		    {0};           //!< The total amount of data in bytes delivered so far
+  Time                   m_deliveredTime    {Seconds (0)}; //!< Simulator time when m_delivered was last updated
+  Time                   m_firstSentTime    {Seconds (0)}; //!< The send time of the packet that was most recently marked as delivered
+  uint32_t               m_appLimited		    {0};           //!< The index of the last transmitted packet marked as application-limited
+  uint32_t               m_lastAckedSackedBytes {0};       //!< Size of data sacked in the last ack
+  uint32_t               m_txItemDelivered      {0};
+
+  struct RateSample      m_rs;
 
   /**
    * \brief Get cwnd in segments rather than bytes
@@ -1103,6 +1142,41 @@ protected:
   void NotifyPacingPerformed (void);
 
   /**
+   * \brief Selects congestion ops method for cwnd adjustment
+   *
+   * This method determines whether to use CongControl or follow the
+   * normal cwnd increase/decrease.
+   *
+   * \param segsAcked count of segments acked
+   */
+  void TcpCongControl (uint32_t segsAcked);
+
+  /**
+   * \brief Updates per packet variables required for rate sampling on each
+   * packet transmission
+   */
+  void UpdatePacketSent (SequenceNumber32 seq, uint32_t sz);
+
+  /**
+   * \brief Calculates delivery rate on arrival or each acknowledged
+   *
+   * \returns True if delivery rate is updated
+   */
+  void UpdateRateSample (SequenceNumber32 seq);
+
+  /**
+   * \brief Calculates delivery rate on arrival or each acknowledged
+   *
+   * \returns True if delivery rate is updated
+   */
+  bool GenerateRateSample ();
+
+  /**
+   * \brief Checks if connection is app-limited upon each write from the application
+   */
+  void OnApplicationWrite ();
+  
+ /**
    * \brief Add Tags for the Socket
    * \param p Packet
    */
@@ -1207,6 +1281,8 @@ protected:
 
   // Pacing related variable
   Timer m_pacingTimer {Timer::REMOVE_ON_DESTROY}; //!< Pacing Event
+
+  PerPacketState_t  m_pps;
 };
 
 /**
@@ -1222,3 +1298,4 @@ typedef void (* TcpCongStatesTracedValueCallback)(const TcpSocketState::TcpCongS
 } // namespace ns3
 
 #endif /* TCP_SOCKET_BASE_H */
+

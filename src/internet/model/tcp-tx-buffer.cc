@@ -678,7 +678,8 @@ TcpTxBuffer::Update (const TcpOptionSack::SackList &list, uint32_t dupAckThresh)
 {
   NS_LOG_FUNCTION (this);
   NS_LOG_INFO ("Updating scoreboard, got " << list.size () << " blocks to analyze");
-
+  m_lastSackedList.clear ();
+  m_lastSackedBytes = 0;
   bool modified = false;
 
   for (auto option_it = list.begin (); option_it != list.end (); ++option_it)
@@ -712,6 +713,8 @@ TcpTxBuffer::Update (const TcpOptionSack::SackList &list, uint32_t dupAckThresh)
                 }
               else
                 {
+                  m_lastSackedList.push_back (beginOfCurrentPacket);
+                  m_lastSackedBytes += pktSize;
                   (*item_it)->m_sacked = true;
                   m_sackedOut++;
                   if (m_highestSack.first == m_sentList.end()
@@ -1166,6 +1169,24 @@ TcpTxBuffer::MarkHeadAsLost ()
           m_lostOut++;
         }
     }
+}
+
+std::vector<SequenceNumber32>
+TcpTxBuffer::GetLastSackedList ()
+{
+  return m_lastSackedList;
+}
+
+uint32_t
+TcpTxBuffer::GetLastSackedBytes ()
+{
+  return m_lastSackedBytes;
+}
+
+uint32_t
+TcpTxBuffer::GetLostBytes (uint32_t segmentSize)
+{
+  return m_lostOut * segmentSize;
 }
 
 std::ostream &

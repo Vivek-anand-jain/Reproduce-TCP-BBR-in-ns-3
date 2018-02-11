@@ -368,6 +368,10 @@ public:
    */
   void AddRenoSack () { m_sackedOut++; }
 
+  std::vector<SequenceNumber32> GetLastSackedList ();
+  uint32_t GetLastSackedBytes ();
+  uint32_t GetLostBytes (uint32_t segmentSize);
+
 private:
   friend std::ostream & operator<< (std::ostream & os, TcpTxBuffer const & tcpTxBuf);
 
@@ -564,6 +568,8 @@ private:
   uint32_t m_sackedOut {0}; //!< Number of segment sacked
   uint32_t m_retrans   {0}; //!< Number of retransmission
 
+  std::vector <SequenceNumber32> m_lastSackedList;
+  uint32_t m_lastSackedBytes;
 };
 
 /**
